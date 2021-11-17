@@ -27,3 +27,17 @@ clang -emit-llvm -S test1.c
 A corresponding .ll file will have been created. Finally to run our LLVM generic pass on the test file:
 ```
 opt -load ../build/lib/LLVMTestPass.so -TestPass < test1.ll > /dev/null
+
+### Building and Running the Generic pass on eecs583 servers
+If you're using the eecs583 servers, you may build and run the generic pass using the run.sh script:
+```
+cd llvm-project
+./run.sh ${PASS_FOLDER} ${PASS_NAME} ${CPROG_NAME}
+```
+Where PASS_FOLDER is the folder to use in Transforms, and PASS_NAME is the name of the pass file. Make sure the pass .cpp file name, the registered pass name
+(from RegisterPass), and the pass name from the bottom-level CMakeLists.txt file are the same.
+Example:
+```
+cd llvm-project
+./run.sh TestPass TestPass test1
+```
