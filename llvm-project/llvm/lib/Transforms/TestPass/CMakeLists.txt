@@ -4,3 +4,4 @@ add_llvm_library(TestPass MODULE
   PLUGIN_TOOL
   opt
 )
+add_dependencies(TestPass intrinsics_gen)
