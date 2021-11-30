@@ -1,0 +1,30 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/joelharr/eecs583-project/llvm-project/pass/Superblock/Superblock.cpp
+llvm/Pass.h
+/home/joelharr/eecs583-project/llvm-project/pass/Superblock/llvm/Pass.h
+llvm/IR/Function.h
+/home/joelharr/eecs583-project/llvm-project/pass/Superblock/llvm/IR/Function.h
+llvm/Analysis/BlockFrequencyInfo.h
+/home/joelharr/eecs583-project/llvm-project/pass/Superblock/llvm/Analysis/BlockFrequencyInfo.h
+llvm/Analysis/BranchProbabilityInfo.h
+/home/joelharr/eecs583-project/llvm-project/pass/Superblock/llvm/Analysis/BranchProbabilityInfo.h
+llvm/Support/raw_ostream.h
+/home/joelharr/eecs583-project/llvm-project/pass/Superblock/llvm/Support/raw_ostream.h
+llvm/Analysis/CFG.h
+/home/joelharr/eecs583-project/llvm-project/pass/Superblock/llvm/Analysis/CFG.h
+llvm/IR/CFG.h
+/home/joelharr/eecs583-project/llvm-project/pass/Superblock/llvm/IR/CFG.h
+iostream
+-
+unordered_set
+-
+vector
+-
+

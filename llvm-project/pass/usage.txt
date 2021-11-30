@@ -1,0 +1,7 @@
+Build pass: 
+cd build
+make -j2
+
+Run benchmark:
+cd into benchmark directory
+./run.sh
