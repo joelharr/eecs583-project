@@ -5,6 +5,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Analysis/CFG.h"
 #include "llvm/IR/CFG.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 #include <iostream>
 #include <unordered_set>
 #include <vector>
@@ -21,6 +22,7 @@ struct SB : public FunctionPass {
   std::unordered_set<BasicBlock *> unvisited;
   std::vector<std::vector<BasicBlock *> > traces;
   BranchProbability THRESHOLD;
+  std::vector<BasicBlock *> duplicates;
 
   // Specify the list of analysis passes that will be used inside your pass.
   void getAnalysisUsage(AnalysisUsage &AU) const {
@@ -87,6 +89,25 @@ struct SB : public FunctionPass {
   	return nullptr;
   }
 
+  // clones a bb
+  BasicBlock *clone_bb(const BasicBlock *BB, Function *F) {
+  	BasicBlock *NewBB = BasicBlock::Create(BB->getContext(), "", F);
+	for (const Instruction &I : *BB) {
+		NewBB->getInstList().push_back(NewInst);
+	}
+	return NewBB;
+  }
+
+  // return index of bb in trace, or return -1 if not in it
+  int in_trace(const BasicBlock *BB, int trace) {
+  	for (int i = 0; i < traces[trace].size(); ++i) {
+		if (traces[trace][i] == BB) {
+			return i;
+		}
+	}
+	return -1;
+  }
+
   bool runOnFunction(Function &F) override {
   	THRESHOLD = BranchProbability(8,10);
     BranchProbabilityInfo &bpi = getAnalysis<BranchProbabilityInfoWrapperPass>().getBPI();
@@ -136,6 +157,71 @@ struct SB : public FunctionPass {
     	errs() << "Trace Size:" << traces[trace].size() << '\n';
     	trace++;
     }
+	
+
+    // find side entrances for each trace
+    for (int i = 0; i < traces.size(); ++i) {
+	std::vector<bool> to_duplicate;
+	std::vector<BasicBlock *> dups;
+	for (int j = 1; j < traces[i].size(); ++j) {
+		to_duplicate.push_back(false);
+		dups.push_back(nullptr);
+	}
+    	for (int j = 1; j < traces[i].size(); ++j) {
+		if (to_duplicate[j]) {
+			*new_bb = clone_bb(traces[i][j], F);
+			dups[j] = new_bb;
+			for (BasicBlock *pred : predecessors(traces[i][j])) {
+				int location = in_trace(pred, i);
+
+				// predecessor from outside the trace
+				if (location == -1) {
+					// get pred to branch to new_bb
+				}
+				else if (dups[location] != nullptr) {
+					// if pred is in the trace and has already been duplicated, update the dup[location] to branch to new_bb
+				}
+			}
+
+			for (BasicBlock *succ : successors(traces[i][j])) {
+				int location = in_trace(succ, i);
+				if (location > -1) {
+					to_duplicate[location] = true;
+					if (dups[location] != nullptr) {
+						// if it's already been duplicated, make new_bb branch to dups[location]
+					}
+				}
+			}
+		}
+		else {
+			bool will_be_duped = false;
+			for (BasicBlock *pred : predecessors(traces[i][j])) {
+				int location = in_trace(pred, i);
+
+				// if it's from outside the trace
+				if (location == -1) {
+					will_be_duped = true;
+					break;
+				}
+			}
+
+			if (will_be_duped) {
+				*new_bb = clone_bb(traces[i][j], F);
+                        	dups[j] = new_bb;
+				for (BasicBlock *succ : successors(traces[i][j])) {
+                                int location = in_trace(succ, i);
+                                if (location > -1) {
+                                        to_duplicate[location] = true;
+                                        if (dups[location] != nullptr) {
+                                                // if it's already been duplicated, make new_bb branch to dups[location]
+                                        }
+                                }
+                        }
+			}
+		}
+	}
+    }
+
     return false;
   }
 }; // end of struct Hello
