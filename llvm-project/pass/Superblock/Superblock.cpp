@@ -5,6 +5,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Analysis/CFG.h"
 #include "llvm/IR/CFG.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include <iostream>
 #include <unordered_set>
@@ -93,6 +94,7 @@ struct SB : public FunctionPass {
   BasicBlock *clone_bb(const BasicBlock *BB, Function *F) {
   	BasicBlock *NewBB = BasicBlock::Create(BB->getContext(), "", F);
 	for (const Instruction &I : *BB) {
+		Instruction *NewInst = I.clone();
 		NewBB->getInstList().push_back(NewInst);
 	}
 	return NewBB;
@@ -169,7 +171,7 @@ struct SB : public FunctionPass {
 	}
     	for (int j = 1; j < traces[i].size(); ++j) {
 		if (to_duplicate[j]) {
-			*new_bb = clone_bb(traces[i][j], F);
+			BasicBlock *new_bb = clone_bb(traces[i][j], &F);
 			dups[j] = new_bb;
 			for (BasicBlock *pred : predecessors(traces[i][j])) {
 				int location = in_trace(pred, i);
@@ -177,9 +179,29 @@ struct SB : public FunctionPass {
 				// predecessor from outside the trace
 				if (location == -1) {
 					// get pred to branch to new_bb
+					for (auto &in : *pred) {
+						// for every inst, if it branches to traces[i][j], make it branch to new_bb instead
+						if (llvm::isa <llvm::BranchInst> (&in)) {
+							for (int k = 0; k < in.getNumSuccessors(); k++) {
+								if (in.getSuccessor(k) == traces[i][j]) {
+									in.setSuccessor(k, new_bb);
+								}
+							}
+						}
+					}
 				}
 				else if (dups[location] != nullptr) {
 					// if pred is in the trace and has already been duplicated, update the dup[location] to branch to new_bb
+					for (auto &in : *dups[location]) {
+                                                // for every inst, if it branches to traces[i][j], make it branch to new_bb instead
+                                                if (llvm::isa <llvm::BranchInst> (&in)) {
+                                                        for (int k = 0; k < in.getNumSuccessors(); k++) {
+                                                                if (in.getSuccessor(k) == traces[i][j]) {
+                                                                        in.setSuccessor(k, new_bb);
+                                                                }
+                                                        }
+						}
+					}
 				}
 			}
 
@@ -189,6 +211,16 @@ struct SB : public FunctionPass {
 					to_duplicate[location] = true;
 					if (dups[location] != nullptr) {
 						// if it's already been duplicated, make new_bb branch to dups[location]
+						for (auto &in : *new_bb) {
+                                                	// for every inst, if it branches to traces[i][location], make it branch to dups[location] instead
+                                                	if (llvm::isa <llvm::BranchInst> (&in)) {
+                                                        	for (int k = 0; k < in.getNumSuccessors(); k++) {
+                                                                	if (in.getSuccessor(k) == traces[i][location]) {
+                                                                        	in.setSuccessor(k, dups[location]);
+                                                                	}
+                                                        	}
+                                                	}
+                                        	}
 					}
 				}
 			}
@@ -206,17 +238,27 @@ struct SB : public FunctionPass {
 			}
 
 			if (will_be_duped) {
-				*new_bb = clone_bb(traces[i][j], F);
+				BasicBlock *new_bb = clone_bb(traces[i][j], &F);
                         	dups[j] = new_bb;
 				for (BasicBlock *succ : successors(traces[i][j])) {
-                                int location = in_trace(succ, i);
-                                if (location > -1) {
-                                        to_duplicate[location] = true;
-                                        if (dups[location] != nullptr) {
-                                                // if it's already been duplicated, make new_bb branch to dups[location]
-                                        }
-                                }
-                        }
+                                	int location = in_trace(succ, i);
+                                	if (location > -1) {
+                                        	to_duplicate[location] = true;
+                                        	if (dups[location] != nullptr) {
+                                                	// if it's already been duplicated, make new_bb branch to dups[location]
+                                        		for (auto &in : *new_bb) {
+                                                        	// for every inst, if it branches to traces[i][location], make it branch to dups[location] instead
+                                                        	if (llvm::isa <llvm::BranchInst> (&in)) {
+                                                                	for (int k = 0; k < in.getNumSuccessors(); k++) {
+                                                                        	if (in.getSuccessor(k) == traces[i][location]) {
+                                                                                	in.setSuccessor(k, dups[location]);
+                                                                        	}
+                                                                	}
+                                                        	}
+                                                	}
+						}
+                                	}
+                        	}
 			}
 		}
 	}
