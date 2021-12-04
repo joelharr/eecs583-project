@@ -97,6 +97,7 @@ struct SB : public FunctionPass {
 		Instruction *NewInst = I.clone();
 		NewBB->getInstList().push_back(NewInst);
 	}
+	errs() << "Cloned\n";
 	return NewBB;
   }
 
@@ -160,16 +161,20 @@ struct SB : public FunctionPass {
     	trace++;
     }
 	
+    errs() << "Side Entrances\n";
 
     // find side entrances for each trace
     for (int i = 0; i < traces.size(); ++i) {
+	errs() << "Trace " << i << "\n";
+
 	std::vector<bool> to_duplicate;
 	std::vector<BasicBlock *> dups;
-	for (int j = 1; j < traces[i].size(); ++j) {
+	for (int j = 0; j < traces[i].size(); ++j) {
 		to_duplicate.push_back(false);
 		dups.push_back(nullptr);
 	}
     	for (int j = 1; j < traces[i].size(); ++j) {
+		errs() << "BB num " << j << "\n";
 		if (to_duplicate[j]) {
 			BasicBlock *new_bb = clone_bb(traces[i][j], &F);
 			dups[j] = new_bb;
