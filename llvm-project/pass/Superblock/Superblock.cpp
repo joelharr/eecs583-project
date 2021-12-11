@@ -7,6 +7,7 @@
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/IR/ValueMap.h"
 #include <iostream>
 #include <unordered_set>
 #include <vector>
@@ -24,6 +25,7 @@ struct SB : public FunctionPass {
   std::vector<std::vector<BasicBlock *> > traces;
   BranchProbability THRESHOLD;
   std::vector<BasicBlock *> duplicates;
+  ValueToValueMapTy VMap;
 
   // Specify the list of analysis passes that will be used inside your pass.
   void getAnalysisUsage(AnalysisUsage &AU) const {
@@ -95,9 +97,11 @@ struct SB : public FunctionPass {
   	BasicBlock *NewBB = BasicBlock::Create(BB->getContext(), "", F);
 	for (const Instruction &I : *BB) {
 		Instruction *NewInst = I.clone();
+		VMap[&I] = NewInst;
 		NewBB->getInstList().push_back(NewInst);
 	}
 	errs() << "Cloned\n";
+	VMap[BB] = NewBB;
 	return NewBB;
   }
 
@@ -107,6 +111,17 @@ struct SB : public FunctionPass {
 		if (traces[trace][i] == BB) {
 			return i;
 		}
+	}
+	return -1;
+  }
+
+  int get_inst_location(const BasicBlock *BB, const Instruction *find_in) {
+  	int count = 0;
+	for (auto &in: *BB) {
+		if (&in == find_in) {
+			return count;
+		}
+		count++;
 	}
 	return -1;
   }
@@ -245,6 +260,39 @@ struct SB : public FunctionPass {
 			if (will_be_duped) {
 				BasicBlock *new_bb = clone_bb(traces[i][j], &F);
                         	dups[j] = new_bb;
+
+				for (BasicBlock *pred : predecessors(traces[i][j])) {
+                                	int location = in_trace(pred, i);
+
+                                	// predecessor from outside the trace
+                                	if (location == -1) {
+                                        	// get pred to branch to new_bb
+                                        	for (auto &in : *pred) {
+                                                	// for every inst, if it branches to traces[i][j], make it branch to new_bb instead
+                                                	if (llvm::isa <llvm::BranchInst> (&in)) {
+                                                        	for (int k = 0; k < in.getNumSuccessors(); k++) {
+                                                                	if (in.getSuccessor(k) == traces[i][j]) {
+                                                                        	in.setSuccessor(k, new_bb);
+                                                                	}
+                                                        	}
+                                                	}
+                                        	}
+                                	}
+                                	else if (dups[location] != nullptr) {
+                                        	// if pred is in the trace and has already been duplicated, update the dup[location] to branch to new_bb
+                                        	for (auto &in : *dups[location]) {
+                                                	// for every inst, if it branches to traces[i][j], make it branch to new_bb instead
+                                                	if (llvm::isa <llvm::BranchInst> (&in)) {
+                                                        	for (int k = 0; k < in.getNumSuccessors(); k++) {
+                                                                	if (in.getSuccessor(k) == traces[i][j]) {
+                                                                        	in.setSuccessor(k, new_bb);
+                                                                	}
+                                                        	}
+                                                	}
+                                        	}
+                                	}
+                       		}
+
 				for (BasicBlock *succ : successors(traces[i][j])) {
                                 	int location = in_trace(succ, i);
                                 	if (location > -1) {
@@ -264,6 +312,39 @@ struct SB : public FunctionPass {
 						}
                                 	}
                         	}
+			}
+		}
+	}
+	// fix broken instructions
+	for (int j = 0; j < dups.size(); ++j) {
+		if (dups[j] == nullptr) {
+			continue;
+		}
+		for (auto &in : *dups[j]) {
+			for (int k = 0; k < in.getNumOperands(); k++) {
+				if (VMap.find(in.getOperand(k)) != VMap.end()) {
+					// if operand can be mapped, set it to the mapped value
+					in.setOperand(k, VMap[in.getOperand(k)]);
+				}
+			}
+		}
+	}
+
+	// fix phi nodes
+	for (auto &bb : F) {
+		int location = in_trace(&bb, i);
+		if (location != -1) {
+			// doesn't matter if phi is in the original trace blocks
+			continue;
+		}
+		for (auto &in : bb) {
+			if (PHINode *p = dyn_cast <PHINode>(&in)) {
+				for (int k = 0; k < p->getNumIncomingValues(); k++) {
+					int bb_loc = in_trace(p->getIncomingBlock(k), i);
+					if (bb_loc > -1 && VMap.find(p->getIncomingBlock(k)) != VMap.end()) {
+						p->addIncoming(VMap[p->getIncomingValue(k)], dups[bb_loc]);
+					}
+				}
 			}
 		}
 	}
