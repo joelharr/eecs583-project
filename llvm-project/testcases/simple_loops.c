@@ -17,6 +17,10 @@ int main()
    in[j]+= 10;
   }
 
+  i = 0;
+  while(i < 10){
+    i += 1;
+  }
   
   //for (i = 0; i< 1000; i++)
 //    fprintf(stdout,"%d\n", in[i]);

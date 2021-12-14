@@ -18,19 +18,34 @@
 #define GET_SLP
 
 using namespace llvm;
+
 struct ProfileSLP : public FunctionPass {
     
+    enum OpType { //Ordering in this enum specifies the stat's print order
+        IALU,
+        FALU,
+        MEM,
+        B_BRANCH,
+        UB_BRANCH,
+        OTHER,
+        ENUM_END //Not an instruction type
+    };
     static char ID;
+    static std::map<std::string, ProfileSLP::OpType> opToInstr;
+    static const int SIMD_WIDTH = 4;
+
     ProfileSLP() : FunctionPass(ID) {}
 
     // keep track of unvisited nodes
     // std::unordered_set<BasicBlock *> visited;
     BranchProbability THRESHOLD;
     ValueToValueMapTy VMap;
+    std::vector<std::vector<BasicBlock *>> m_traces;
 
     void getAnalysisUsage(AnalysisUsage &AU) const;
     bool runOnFunction(Function &F) override;
 
+    //Functions for getting superblocks
     BasicBlock* getSeed(BlockFrequencyInfo &bfi, std::unordered_set<BasicBlock *> &unvisited);
     BasicBlock* best_successor(BasicBlock *source, BranchProbabilityInfo &bpi, SmallVector<std::pair<const BasicBlock *, const BasicBlock *> > &backedges, std::unordered_set<BasicBlock *> &unvisited);
     BasicBlock* best_predecessor(BasicBlock *dest, BranchProbabilityInfo &bpi, SmallVector<std::pair<const BasicBlock *, const BasicBlock *> > &backedges, std::unordered_set<BasicBlock *> &unvisited);
@@ -39,6 +54,9 @@ struct ProfileSLP : public FunctionPass {
     int get_inst_location(const BasicBlock *BB, const Instruction *find_in);
 
     bool getSuperblocks(Function &F);
+
+    //Functions for performing SLP
+    bool isIsomorphic(Instruction* a, Instruction* b);
     bool getSLP(Function &F);
 };
 

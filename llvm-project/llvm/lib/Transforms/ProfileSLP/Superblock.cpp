@@ -322,5 +322,6 @@ bool ProfileSLP::getSuperblocks(Function &F){
             }
         }
 } //end of loop i
+    m_traces = traces;
     return false; //FIXME: Needs actual 'changed' value
 }

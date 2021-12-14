@@ -1,3 +1,5 @@
 *.ll
 *.bc
 llvm-project/dot/*.pdf
+llvm-project/*.profdata
+llvm-project/*.prof
