@@ -1,29 +1,23 @@
-#include "llvm/Pass.h"
-#include "llvm/IR/Function.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Analysis/BranchProbabilityInfo.h"
+#include "ProfileSLP.h"
 
 using namespace llvm;
 
-namespace {
-struct ProfileSLP : public FunctionPass {
-  static char ID;
-  ProfileSLP() : FunctionPass(ID) {}
+// Specify the list of analysis passes that will be used inside your pass.
+void ProfileSLP::getAnalysisUsage(AnalysisUsage &AU) const {
+    AU.addRequired<BlockFrequencyInfoWrapperPass>();
+    AU.addRequired<BranchProbabilityInfoWrapperPass>();
+    // AU.addRequired<CFG>();
+}
 
-  void getAnalysisUsage(AnalysisUsage &AU) const {
-    AU.addRequired<BranchProbabilityInfoWrapperPass>(); // Analysis pass to load branch probability
-  }
-
-  bool runOnFunction(Function &F) override {
-    errs() << "ProfileSLP Hello: ";
-    errs().write_escaped(F.getName()) << '\n';
-    BranchProbabilityInfo &bpi = getAnalysis<BranchProbabilityInfoWrapperPass>().getBPI();
-    return false;
-  }
-}; // end of struct ProfileSLP
-}  // end of anonymous namespace
+bool ProfileSLP::runOnFunction(Function &F) {
+    bool changed = getSuperblocks(F);
+    #ifdef GET_SLP //Enable and disable getting SLP
+    changed |= getSLP(F);
+    #endif
+    return changed;
+}
 
 char ProfileSLP::ID = 0;
-static RegisterPass<ProfileSLP> X("ProfileSLP", "ProfileSLP Pass",
+static RegisterPass<ProfileSLP> X("ProfileSLP", "Profile SLP Pass",
                              false /* Only looks at CFG */,
                              false /* Analysis Pass */);

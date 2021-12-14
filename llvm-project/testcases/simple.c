@@ -5,7 +5,7 @@ int main()
 
   int in[1000]; 
   int i,j;
-  FILE* myfile;
+  //FILE* myfile;
 
   for (i = 0; i < 1000; i++)
   {
@@ -18,7 +18,7 @@ int main()
   }
 
   
-  for (i = 0; i< 1000; i++)
+  //for (i = 0; i< 1000; i++)
 //    fprintf(stdout,"%d\n", in[i]);
   
   return 1;
