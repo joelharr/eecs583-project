@@ -25,20 +25,17 @@ struct ProfileSLP : public FunctionPass {
 
     // keep track of unvisited nodes
     // std::unordered_set<BasicBlock *> visited;
-    std::unordered_set<BasicBlock *> unvisited;
-    std::vector<std::vector<BasicBlock *> > traces;
     BranchProbability THRESHOLD;
-    std::vector<BasicBlock *> duplicates;
     ValueToValueMapTy VMap;
 
     void getAnalysisUsage(AnalysisUsage &AU) const;
     bool runOnFunction(Function &F) override;
 
-    BasicBlock* getSeed(BlockFrequencyInfo &bfi);
-    BasicBlock* best_successor(BasicBlock *source, BranchProbabilityInfo &bpi, SmallVector<std::pair<const BasicBlock *, const BasicBlock *> > &backedges);
-    BasicBlock* best_predecessor(BasicBlock *dest, BranchProbabilityInfo &bpi, SmallVector<std::pair<const BasicBlock *, const BasicBlock *> > &backedges);
+    BasicBlock* getSeed(BlockFrequencyInfo &bfi, std::unordered_set<BasicBlock *> &unvisited);
+    BasicBlock* best_successor(BasicBlock *source, BranchProbabilityInfo &bpi, SmallVector<std::pair<const BasicBlock *, const BasicBlock *> > &backedges, std::unordered_set<BasicBlock *> &unvisited);
+    BasicBlock* best_predecessor(BasicBlock *dest, BranchProbabilityInfo &bpi, SmallVector<std::pair<const BasicBlock *, const BasicBlock *> > &backedges, std::unordered_set<BasicBlock *> &unvisited);
     BasicBlock* clone_bb(const BasicBlock *BB, Function *F);
-    int in_trace(const BasicBlock *BB, int trace);
+    int in_trace(const BasicBlock *BB, int trace, std::vector<std::vector<BasicBlock *> > &traces);
     int get_inst_location(const BasicBlock *BB, const Instruction *find_in);
 
     bool getSuperblocks(Function &F);
