@@ -109,10 +109,11 @@ void ProfileSLP::printInstrGroup(std::vector<Instruction*> group){
     }
 }
 
-bool ProfileSLP::getSLP(Function &F){
+std::vector<std::vector<Instruction*>> ProfileSLP::getSLP(Function &F){
     errs() << "Running getSLP... \n";
     //Iterate through all traces
     std::vector<std::vector<BasicBlock *>> traces = *m_traces;
+    std::vector<std::vector<Instruction*>> vec_confirmed; //Move isomorphic groups here once they're full
     int vectorizedCount = 0;
     for(int i = 0; i < traces.size(); ++i){
         errs() << "SLP Trace " << i << "\n";
@@ -143,7 +144,6 @@ bool ProfileSLP::getSLP(Function &F){
 
         //Build vectorizable groups
         std::map<std::string, IsomorphicGroup*> vec_cands;
-        std::vector<IsomorphicGroup*> vec_confirmed; //Move isomorphic groups here once they're full
         IsomorphicGroup* currentGroup;
         for(auto idx : topsort_order){
             auto in = instrs[idx];
@@ -162,7 +162,7 @@ bool ProfileSLP::getSLP(Function &F){
                     if(currentGroup->size == ProfileSLP::SIMD_WIDTH){ //Upgrade to confirmed vectorization once we've reached SIMD width
                         errs() << "Found a vector of ops: " << opName << "\n";
                         printInstrGroup(currentGroup->instrs);
-                        vec_confirmed.push_back(currentGroup);
+                        vec_confirmed.push_back(currentGroup->instrs);
                         vec_cands.erase(opName);
                         ++vectorizedCount;
                     }
@@ -171,7 +171,7 @@ bool ProfileSLP::getSLP(Function &F){
         }
     }
     delete m_traces; //Free up memory
-    return false;
+    return vec_confirmed;
 }
 
 std::map<std::string, ProfileSLP::OpType> ProfileSLP::opToInstr = {

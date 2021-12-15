@@ -12,7 +12,12 @@ void ProfileSLP::getAnalysisUsage(AnalysisUsage &AU) const {
 bool ProfileSLP::runOnFunction(Function &F) {
     bool changed = getSuperblocks(F);
     #ifdef GET_SLP //Enable and disable getting SLP
-    changed |= getSLP(F);
+    auto SLP_vecs = getSLP(F);
+    errs() << "SLP Vectorization Groups: \n"; 
+    for(auto vec : SLP_vecs){
+        errs() << "Group: \n";
+        ProfileSLP::printInstrGroup(vec);
+    }
     #endif
     return changed;
 }

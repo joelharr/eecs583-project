@@ -59,7 +59,7 @@ struct ProfileSLP : public FunctionPass {
     //Functions for performing SLP
     std::vector<int> BF_ToplogicalSort(std::map<Instruction*, int> &instrs);
     void printInstrGroup(std::vector<Instruction*> group);
-    bool getSLP(Function &F);
+    std::vector<std::vector<Instruction*>> getSLP(Function &F);
 };
 
 #endif
