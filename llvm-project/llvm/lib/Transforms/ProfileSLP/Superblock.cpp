@@ -316,7 +316,7 @@ bool ProfileSLP::getSuperblocks(Function &F){
                 if (PHINode *p = dyn_cast <PHINode>(&in)) {
                     for (int k = 0; k < p->getNumIncomingValues(); k++) {
                         int bb_loc = in_trace(p->getIncomingBlock(k), i, traces);
-                        if (bb_loc > -1 && VMap.find(p->getIncomingBlock(k)) != VMap.end()) {
+                        if (bb_loc > -1 && dups[bb_loc] != nullptr && VMap.find(p->getIncomingBlock(k)) != VMap.end() && VMap.find(p->getIncomingValue(k)) != VMap.end()) {
                             p->addIncoming(VMap[p->getIncomingValue(k)], dups[bb_loc]);
                         }
                     }
