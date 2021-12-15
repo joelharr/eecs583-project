@@ -12,7 +12,9 @@ struct IsomorphicGroup {
     IsomorphicGroup(Instruction* instr){
         opName = instr->getOpcodeName();
         opType = ProfileSLP::opToInstr[opName];
-        validOp = (opType == ProfileSLP::OpType::IALU) || (opType == ProfileSLP::OpType::FALU);
+        validOp = (opType == ProfileSLP::OpType::IALU) ||
+                  (opType == ProfileSLP::OpType::FALU) ||
+                  (opType == ProfileSLP::OpType::LOAD);
         if(validOp){
             instrs.push_back(instr);
             size = 1;
@@ -59,7 +61,9 @@ std::vector<int> ProfileSLP::BF_ToplogicalSort(std::map<Instruction*, int> &inst
     for(auto &from : instrs){
         for(User *U : from.first->users()){
             if (Instruction *inst = dyn_cast<Instruction>(U)) {
-                DAG[from.second].push_back(instrs.find(inst)->second);
+                if(instrs.find(inst) != instrs.end()){ //Must actually be in the trace
+                    DAG[from.second].push_back(instrs.find(inst)->second);
+                }
             }
         }
     }
@@ -105,7 +109,7 @@ std::vector<int> ProfileSLP::BF_ToplogicalSort(std::map<Instruction*, int> &inst
 
 void ProfileSLP::printInstrGroup(std::vector<Instruction*> group){
     for(const auto instr : group){
-        errs() << *instr << "\n"; 
+        errs() << *instr << "\n";
     }
 }
 
@@ -205,11 +209,11 @@ std::map<std::string, ProfileSLP::OpType> ProfileSLP::opToInstr = {
     {"fcmp", FALU},
 
     // Memory Instructions
-    {"alloca", MEM},
-    {"load", MEM},
-    {"store", MEM},
-    {"getelementptr", MEM},
-    {"fence", MEM},
-    {"cmpxchg", MEM},
-    {"atomicrmw", MEM}
+    {"load", LOAD},
+    {"store", STORE},
+    {"alloca", MEM_OTHER},
+    {"getelementptr", MEM_OTHER},
+    {"fence", MEM_OTHER},
+    {"cmpxchg", MEM_OTHER},
+    {"atomicrmw", MEM_OTHER}
 };
