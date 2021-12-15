@@ -16,10 +16,12 @@ bool ProfileSLP::runOnFunction(Function &F) {
     errs() << "SLP Vectorization Groups: \n"; 
     for(auto vec : SLP_vecs){
         errs() << "Group: \n";
-        ProfileSLP::printInstrGroup(vec);
+        printInstrGroup(vec);
     }
+    LLVMContext& context = F.getContext();
+    vectorize(SLP_vecs[0], context);
     #endif
-    return changed;
+    return true;
 }
 
 char ProfileSLP::ID = 0;

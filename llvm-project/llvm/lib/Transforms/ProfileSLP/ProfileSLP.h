@@ -60,6 +60,9 @@ struct ProfileSLP : public FunctionPass {
     std::vector<int> BF_ToplogicalSort(std::map<Instruction*, int> &instrs);
     void printInstrGroup(std::vector<Instruction*> group);
     std::vector<std::vector<Instruction*>> getSLP(Function &F);
+
+    //Function for emitting Vector IR
+    Instruction* vectorize(std::vector<Instruction*> instr, LLVMContext& context);
 };
 
 #endif
