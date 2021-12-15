@@ -20,6 +20,7 @@ bool ProfileSLP::runOnFunction(Function &F) {
     }
     LLVMContext& context = F.getContext();
     vectorize(SLP_vecs[0], context);
+    vectorize(SLP_vecs[1], context);
     #endif
     return true;
 }

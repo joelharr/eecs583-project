@@ -9,6 +9,6 @@ int main(){
     int e1 = c + d; //<-- G1
     int e2 = e1 + d; //<-- G2
     int e3 = e2 + e1;
-
+    printf("%d %d %d %d %d\n", a1, a2, e1, e2, e3);
     return 0;
 }
