@@ -99,10 +99,12 @@ bool ProfileSLP::getSuperblocks(Function &F){
     BranchProbabilityInfo &bpi = getAnalysis<BranchProbabilityInfoWrapperPass>().getBPI();
     BlockFrequencyInfo &bfi = getAnalysis<BlockFrequencyInfoWrapperPass>().getBFI();
 
+    //Allocate traces on the heap so that it's available to the SLP pass later
+    m_traces = new std::vector<std::vector<BasicBlock *>>;
+    std::vector<std::vector<BasicBlock *>>& traces = *m_traces;
+    
     std::unordered_set<BasicBlock *> unvisited;
-    std::vector<std::vector<BasicBlock *> > traces;
     std::vector<BasicBlock *> duplicates;
-
 
     SmallVector<std::pair<const BasicBlock *, const BasicBlock *> > backedges;
     FindFunctionBackedges(F, backedges);
@@ -322,6 +324,5 @@ bool ProfileSLP::getSuperblocks(Function &F){
             }
         }
 } //end of loop i
-    m_traces = traces;
     return false; //FIXME: Needs actual 'changed' value
 }

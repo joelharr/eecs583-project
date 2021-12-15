@@ -16,14 +16,21 @@ cd ..
 # This approach has an issue with -O2, so we are going to stick with default optimization level (-O0)
 clang -O0 -Xclang -disable-O0-optnone ./testcases/${1}.c -emit-llvm -c -o ${1}.bc
 
+USE_UNROLL=False #Disable unroll if desired
+if [[ $USE_UNROLL == True ]]; then
+    ./viz.sh ${1}
+    opt -mem2reg -simplifycfg -indvars -loop-unroll -unroll-count=4 -simplifycfg ${1}.bc -o ${1}_unrolled.bc
+    SLP_BC_IN=${1}_unrolled
+else
+    SLP_BC_IN=${1}
+fi
+
 # Apply loop unrolling
 # Add -time-passes to time the pass
-./viz.sh ${1}
-opt -mem2reg -simplifycfg -indvars -loop-unroll -unroll-count=4 -simplifycfg ${1}.bc -o ${1}_unrolled.bc
-./viz.sh ${1}_unrolled
+./viz.sh ${SLP_BC_IN}
 
 # Instrument profiler
-opt -pgo-instr-gen -instrprof ${1}_unrolled.bc -o ${1}.prof.bc
+opt -pgo-instr-gen -instrprof ${SLP_BC_IN}.bc -o ${1}.prof.bc
 # Generate binary executable with profiler embedded
 clang -fprofile-instr-generate ${1}.prof.bc -o ${1}.prof
 # Collect profiling data
@@ -32,7 +39,7 @@ clang -fprofile-instr-generate ${1}.prof.bc -o ${1}.prof
 llvm-profdata merge -output=${1}_SLP.profdata default.profraw
 
 # run SLP pass on unrolled code
-opt -pgo-instr-use -pgo-test-profile-file=${1}_SLP.profdata -load ./build/${SLP_PATH}/ProfileSLP.so -ProfileSLP ${1}_unrolled.bc -o ${1}_SLP.bc
+opt -pgo-instr-use -pgo-test-profile-file=${1}_SLP.profdata -load ./build/${SLP_PATH}/ProfileSLP.so -ProfileSLP ${SLP_BC_IN}.bc -o ${1}_SLP.bc
 ./viz.sh ${1}_SLP
 
 # Cleanup

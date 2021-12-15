@@ -41,7 +41,7 @@ struct ProfileSLP : public FunctionPass {
     // std::unordered_set<BasicBlock *> visited;
     BranchProbability THRESHOLD;
     ValueToValueMapTy VMap;
-    std::vector<std::vector<BasicBlock *>> m_traces;
+    std::vector<std::vector<BasicBlock *>>* m_traces;
 
     void getAnalysisUsage(AnalysisUsage &AU) const;
     bool runOnFunction(Function &F) override;
@@ -57,7 +57,8 @@ struct ProfileSLP : public FunctionPass {
     bool getSuperblocks(Function &F);
 
     //Functions for performing SLP
-    std::vector<int> BF_ToplogicalSort(const std::map<Instruction*, int> &instrs);
+    std::vector<int> BF_ToplogicalSort(std::map<Instruction*, int> &instrs);
+    void printInstrGroup(std::vector<Instruction*> group);
     bool getSLP(Function &F);
 };
 

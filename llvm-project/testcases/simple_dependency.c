@@ -4,10 +4,10 @@ int main(){
     int c = 3;
     int d = 4;
 
-    int a1 = a + b;
-    int a2 = a1 + b;
-    int e1 = c + d; 
-    int e2 = e1 + d;
+    int a1 = a + b; //<-- G1
+    int a2 = a1 + b; //<-- G2
+    int e1 = c + d; //<-- G1
+    int e2 = e1 + d; //<-- G2
     int e3 = e2 + e1;
 
     return 0;

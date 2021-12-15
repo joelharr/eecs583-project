@@ -12,8 +12,13 @@ struct IsomorphicGroup {
     IsomorphicGroup(Instruction* instr){
         opName = instr->getOpcodeName();
         opType = ProfileSLP::opToInstr[opName];
-        validOp = (opType == ProfileSLP::OpType::IALU) || (opType == ProfileSLP::OpType::FALU); 
-        size = 1;
+        validOp = (opType == ProfileSLP::OpType::IALU) || (opType == ProfileSLP::OpType::FALU);
+        if(validOp){
+            instrs.push_back(instr);
+            size = 1;
+        } else {
+            size = 0;
+        }
     }
 
     bool isIsomorphicToGroup(Instruction* newInstr){
@@ -46,11 +51,12 @@ struct IsomorphicGroup {
 };
 
 //Breadth-first toplogical sort
-std::vector<int> ProfileSLP::BF_ToplogicalSort(const std::map<Instruction*, int> &instrs){
+std::vector<int> ProfileSLP::BF_ToplogicalSort(std::map<Instruction*, int> &instrs){
     //Construct a DAG for the def-use chains
+    errs() << "Building DAG \n";
     int nInstrs = instrs.size();
     std::vector<std::vector<int>> DAG(nInstrs);
-    for(const auto &from : instrs){
+    for(auto &from : instrs){
         for(User *U : from.first->users()){
             if (Instruction *inst = dyn_cast<Instruction>(U)) {
                 DAG[from.second].push_back(instrs.find(inst)->second);
@@ -59,14 +65,16 @@ std::vector<int> ProfileSLP::BF_ToplogicalSort(const std::map<Instruction*, int>
     }
 
     //Compute the number of dependencies that each instruction has
+    errs() << "Computing dependencies \n";
     std::vector<int> numDeps(nInstrs, 0);
     for(int i = 0; i < nInstrs; ++i){
         for(int j : DAG[i]){
-            ++numDeps[DAG[i][j]];
+            ++numDeps[j];
         }
     }
 
     //Queue instructions that have no dependencies
+    errs() << "Queueing dependencies \n";
     std::queue<int> q;
     for(int i = 0; i < nInstrs; ++i){
         if(numDeps[i] == 0){
@@ -75,6 +83,7 @@ std::vector<int> ProfileSLP::BF_ToplogicalSort(const std::map<Instruction*, int>
     }
 
     //Dequeue nodes with zero dependencies, then iteratively update the dependency list
+    errs() << "Dequeueing \n";
     std::vector<int> solution;
     while(q.size() > 0){
         //Add to solution from queue
@@ -85,36 +94,52 @@ std::vector<int> ProfileSLP::BF_ToplogicalSort(const std::map<Instruction*, int>
         //Update dependency list
         //Anything that depends on the 'current' instruction now has one less dependency
         for(int i : DAG[current]){ 
-            int dependent = DAG[current][i];
-            --numDeps[dependent];
-            if(numDeps[dependent] == 0) { 
-                q.push(dependent); //No dependencies left, so add to queue
+            --numDeps[i];
+            if(numDeps[i] == 0) { 
+                q.push(i); //No dependencies left, so add to queue
             }
         }
     }
     return solution;
 }
 
+void ProfileSLP::printInstrGroup(std::vector<Instruction*> group){
+    for(const auto instr : group){
+        errs() << *instr << "\n"; 
+    }
+}
+
 bool ProfileSLP::getSLP(Function &F){
+    errs() << "Running getSLP... \n";
     //Iterate through all traces
+    std::vector<std::vector<BasicBlock *>> traces = *m_traces;
     int vectorizedCount = 0;
-    for(int i = 0; i < m_traces.size(); ++i){
+    for(int i = 0; i < traces.size(); ++i){
         errs() << "SLP Trace " << i << "\n";
 
         //Extract all instructions
         std::map<Instruction*, int> instr_map;
         std::vector<Instruction*> instrs;
-        for(int j = 0; j < m_traces[i].size(); ++j){
-            BasicBlock* b = m_traces[i][j];
+        int instr_num = 0;
+        for(BasicBlock *b : traces[i]){
             errs() << "BB: " << *b << "\n";
             for(auto &in : *b){ 
-                instr_map[&in] = j;
+                instr_map[&in] = instr_num;
                 instrs.push_back(&in);
+                ++instr_num;
             }
         }
+        errs() << "End trace printout \n";
 
         //Find the breadth-first topological ordering of the def-use chains within this superblock
         auto topsort_order = BF_ToplogicalSort(instr_map);
+
+        //Print topological order
+        errs() << "Topological order:\n";
+        for(auto idx : topsort_order){
+            auto in = instrs[idx];
+            errs() << *in << "\n";
+        }
 
         //Build vectorizable groups
         std::map<std::string, IsomorphicGroup*> vec_cands;
@@ -128,16 +153,15 @@ bool ProfileSLP::getSLP(Function &F){
                 vec_cands.clear();
             } else {
                 std::string opName = in->getOpcodeName();
-                //errs() << opName << "\n";
                 if(vec_cands.find(opName) == vec_cands.end()){ //Start a new isomorphic group with a given op type
                     currentGroup = new IsomorphicGroup(in);
                     vec_cands.insert(std::pair<std::string, IsomorphicGroup*>(opName, currentGroup));
                 } else {
                     currentGroup = vec_cands[opName];
-                    //errs() << "Found group: " << currentGroup->opName << " from key: " << opName << "\n";
                     currentGroup->insertIfIsomorphic(in);
                     if(currentGroup->size == ProfileSLP::SIMD_WIDTH){ //Upgrade to confirmed vectorization once we've reached SIMD width
                         errs() << "Found a vector of ops: " << opName << "\n";
+                        printInstrGroup(currentGroup->instrs);
                         vec_confirmed.push_back(currentGroup);
                         vec_cands.erase(opName);
                         ++vectorizedCount;
@@ -146,7 +170,7 @@ bool ProfileSLP::getSLP(Function &F){
             }
         }
     }
-
+    delete m_traces; //Free up memory
     return false;
 }
 
