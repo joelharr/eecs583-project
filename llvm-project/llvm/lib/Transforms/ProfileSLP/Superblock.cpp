@@ -314,15 +314,41 @@ bool ProfileSLP::getSuperblocks(Function &F){
             }
             for (auto &in : bb) {
                 if (PHINode *p = dyn_cast <PHINode>(&in)) {
-                    for (int k = 0; k < p->getNumIncomingValues(); k++) {
-                        int bb_loc = in_trace(p->getIncomingBlock(k), i, traces);
-                        if (bb_loc > -1 && dups[bb_loc] != nullptr && VMap.find(p->getIncomingBlock(k)) != VMap.end() && VMap.find(p->getIncomingValue(k)) != VMap.end()) {
-                            p->addIncoming(VMap[p->getIncomingValue(k)], dups[bb_loc]);
-                        }
+		    if (!p->isComplete()) {
+			    // check for clones of values already in the PHI node
+			    for (int k = 0; k < p->getNumIncomingValues(); k++) {
+				int bb_loc = in_trace(p->getIncomingBlock(k), i, traces);
+				if (VMap.find(p->getIncomingBlock(k)) != VMap.end() && VMap.find(p->getIncomingValue(k)) != VMap.end()) {
+				    if (BasicBlock *temp = dyn_cast<BasicBlock>(VMap[p->getIncomingBlock(k)])) {
+					p->addIncoming(VMap[p->getIncomingValue(k)], temp);
+				    }
+				    else if (bb_loc > -1) {
+					p->addIncoming(VMap[p->getIncomingValue(k)], dups[bb_loc]);
+				    } 
+				}
+				else if (VMap.find(p->getIncomingBlock(k)) != VMap.end()) {
+				    if (BasicBlock *temp = dyn_cast<BasicBlock>(VMap[p->getIncomingBlock(k)])) {
+					p->addIncoming(p->getIncomingValue(k), temp);
+				    }
+				}
+			    }
                     }
-                }
-            }
-        }
+		    // check for values no longer from a predecessor
+		    for (int k = 0; k < p->getNumIncomingValues(); k++) {
+		    	bool still_in = false;
+			for (auto *p_bb : predecessors(p->getParent())) {
+                            if (p->getIncomingBlock(k) == p_bb) {
+			    	still_in = true;
+				break;
+			    }
+                        }
+			if (!still_in) {
+			    p->removeIncomingValue(k);
+			}
+		    }
+            	}
+	    }
+	}
 } //end of loop i
     return false; //FIXME: Needs actual 'changed' value
 }
