@@ -14,6 +14,7 @@
 #include <iostream>
 #include <unordered_set>
 #include <vector>
+#include <queue>
 
 #define GET_SLP
 
@@ -32,7 +33,7 @@ struct ProfileSLP : public FunctionPass {
     };
     static char ID;
     static std::map<std::string, ProfileSLP::OpType> opToInstr;
-    static const int SIMD_WIDTH = 4;
+    static const int SIMD_WIDTH = 2; //2 is good for testing, maybe 4 for performance. Never choose 1
 
     ProfileSLP() : FunctionPass(ID) {}
 
@@ -56,7 +57,7 @@ struct ProfileSLP : public FunctionPass {
     bool getSuperblocks(Function &F);
 
     //Functions for performing SLP
-    bool isIsomorphic(Instruction* a, Instruction* b);
+    std::vector<int> BF_ToplogicalSort(const std::map<Instruction*, int> &instrs);
     bool getSLP(Function &F);
 };
 
