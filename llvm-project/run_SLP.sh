@@ -16,10 +16,11 @@ cd ..
 # This approach has an issue with -O2, so we are going to stick with default optimization level (-O0)
 clang -O0 -Xclang -disable-O0-optnone ./testcases/${1}.c -emit-llvm -c -o ${1}.bc
 
-USE_UNROLL=False #Disable unroll if desired
+USE_UNROLL=True #Disable unroll if desired
 if [[ $USE_UNROLL == True ]]; then
     ./viz.sh ${1}
-    opt -mem2reg -simplifycfg -indvars -loop-unroll -unroll-count=4 -simplifycfg ${1}.bc -o ${1}_unrolled.bc
+    #opt -mem2reg -simplifycfg -indvars -loop-unroll -unroll-count=4 -simplifycfg ${1}.bc -o ${1}_unrolled.bc
+    opt -loop-unroll -unroll-count=4 ${1}.bc -o ${1}_unrolled.bc
     SLP_BC_IN=${1}_unrolled
 else
     SLP_BC_IN=${1}

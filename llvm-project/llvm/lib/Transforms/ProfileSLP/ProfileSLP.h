@@ -25,7 +25,9 @@ struct ProfileSLP : public FunctionPass {
     enum OpType { //Ordering in this enum specifies the stat's print order
         IALU,
         FALU,
-        MEM,
+        LOAD,
+        STORE,
+        MEM_OTHER,
         B_BRANCH,
         UB_BRANCH,
         OTHER,
@@ -33,7 +35,7 @@ struct ProfileSLP : public FunctionPass {
     };
     static char ID;
     static std::map<std::string, ProfileSLP::OpType> opToInstr;
-    static const int SIMD_WIDTH = 2; //2 is good for testing, maybe 4 for performance. Never choose 1
+    static const int SIMD_WIDTH = 4; //2 is good for testing, maybe 4 for performance. Never choose 1
 
     ProfileSLP() : FunctionPass(ID) {}
 
