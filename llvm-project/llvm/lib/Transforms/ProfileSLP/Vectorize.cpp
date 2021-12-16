@@ -1,7 +1,15 @@
 #include "ProfileSLP.h"
 #include "llvm/IR/IRBuilder.h"
 
+Instruction* ProfileSLP::vectorizeWrapper(std::vector<std::vector<Instruction*>> &instr_groups, LLVMContext& context) {
+    for (int i = 0; i < instr_groups.size(); i++) {
+        vectorize(instr_groups[i], context);
+    }
+    return nullptr;
+}
+
 Instruction* ProfileSLP::vectorize(std::vector<Instruction*> instr, LLVMContext& context) {
+
 	Instruction *firstI = *(instr.begin());
     Instruction *lastI = *(instr.begin()+(instr.size()-1));
     BasicBlock *parent = firstI->getParent();
@@ -9,12 +17,11 @@ Instruction* ProfileSLP::vectorize(std::vector<Instruction*> instr, LLVMContext&
 
     IRBuilder<> build(context);
     unsigned int width = instr.size();
-    auto *eltTy = firstI->getOperand(0)->getType();
-    auto *Ty = IntegerType::get(context, 32);
+    auto *Ty = firstI->getOperand(0)->getType();
+    auto *vType = ConstantInt::get(Ty, 0);
 
-    // input vectors
-    Value *inVec1 = build.CreateVectorSplat(width, ConstantInt::get(Ty, 0));
-    Value *inVec2 = build.CreateVectorSplat(width, ConstantInt::get(Ty, 0));
+    Value *inVec1 = build.CreateVectorSplat(width, vType);
+    Value *inVec2 = build.CreateVectorSplat(width, vType);
 
     Value *next1 = inVec1;
     Value *next2 = inVec2;
@@ -40,8 +47,56 @@ Instruction* ProfileSLP::vectorize(std::vector<Instruction*> instr, LLVMContext&
       	}
     }
 
-    // perform add on vectors
-    Value* outVec = build.CreateAdd(next1, next2);
+    Value *outVec;
+    unsigned op = instr[0]->getOpcode();
+    switch(op) {
+        case Instruction::Add :
+            outVec = build.CreateAdd(next1, next2);
+            break;
+        case Instruction::Sub :
+            outVec = build.CreateSub(next1, next2);
+            break;
+        case Instruction::Mul :
+            outVec = build.CreateMul(next1, next2);
+            break;
+        case Instruction::UDiv :
+            outVec = build.CreateUDiv(next1, next2);
+            break;
+        case Instruction::SDiv :
+            outVec = build.CreateSDiv(next1, next2);
+            break;
+        case Instruction::URem :
+            outVec = build.CreateURem(next1, next2);
+            break;
+        case Instruction::Shl :
+            outVec = build.CreateShl(next1, next2);
+            break;
+        case Instruction::LShr :
+            outVec = build.CreateLShr(next1, next2);
+            break;
+        case Instruction::AShr :
+            outVec = build.CreateAShr(next1, next2);
+            break;
+        case Instruction::And :
+            outVec = build.CreateAnd(next1, next2);
+            break;
+        case Instruction::Or :
+            outVec = build.CreateOr(next1, next2);
+            break;
+        case Instruction::Xor :
+            outVec = build.CreateXor(next1, next2);
+            break;
+        case Instruction::ICmp :
+            outVec = build.CreateICmpEQ(next1, next2);
+            break;
+        case Instruction::SRem :
+            outVec = build.CreateSRem(next1, next2);
+            break;
+
+        default : 
+            errs() << "Type Not Supported\n";
+    }
+
     // unpack
     for (int i = 0; i < width; i++) {
         Value *out = build.CreateExtractElement(outVec, build.getInt64(i));
