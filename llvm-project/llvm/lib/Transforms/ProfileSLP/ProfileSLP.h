@@ -11,12 +11,11 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/IR/ValueMap.h"
+#include "llvm/IR/IRBuilder.h"
 #include <iostream>
 #include <unordered_set>
 #include <vector>
 #include <queue>
-
-#define GET_SLP
 
 using namespace llvm;
 
@@ -28,8 +27,7 @@ struct ProfileSLP : public FunctionPass {
         LOAD,
         STORE,
         MEM_OTHER,
-        B_BRANCH,
-        UB_BRANCH,
+        BRANCH,
         OTHER,
         ENUM_END //Not an instruction type
     };
@@ -45,6 +43,7 @@ struct ProfileSLP : public FunctionPass {
     ValueToValueMapTy VMap;
     std::vector<std::vector<BasicBlock *>>* m_traces;
 
+    void printInstrGroup(std::vector<Instruction*> group);
     void getAnalysisUsage(AnalysisUsage &AU) const;
     bool runOnFunction(Function &F) override;
 
@@ -58,10 +57,13 @@ struct ProfileSLP : public FunctionPass {
 
     bool getSuperblocks(Function &F);
 
-    //Functions for performing SLP
-    std::vector<int> BF_ToplogicalSort(std::map<Instruction*, int> &instrs);
-    void printInstrGroup(std::vector<Instruction*> group);
+    //Functions for identifying vectorizable groups
+    std::vector<int> BF_ToplogicalSort(std::map<Instruction*, int> &instr_map, std::vector<Instruction*> &instrs);
     std::vector<std::vector<Instruction*>> getSLP(Function &F);
+    template <class T, class I> void addIfInMap(T item, std::map<T, I>* map, std::vector<I>* vec);
+
+    //Functions for hoisting functions into their vectorizable groups
+    bool hoist(std::vector<std::vector<Instruction*>> SLP_vecs);
 
     //Function for emitting Vector IR
     Instruction* vectorize(std::vector<Instruction*> instr, LLVMContext& context);

@@ -20,7 +20,7 @@ USE_UNROLL=True #Disable unroll if desired
 if [[ $USE_UNROLL == True ]]; then
     ./viz.sh ${1}
     opt -mem2reg -simplifycfg -indvars -loop-unroll -unroll-count=4 -simplifycfg ${1}.bc -o ${1}_unrolled.bc
-    #opt -loop-unroll -unroll-count=4 ${1}.bc -o ${1}_unrolled.bc
+    #opt -mem2reg -loop-unroll -unroll-count=4 ${1}.bc -o ${1}_unrolled.bc
     SLP_BC_IN=${1}_unrolled
 else
     SLP_BC_IN=${1}
@@ -35,7 +35,7 @@ opt -pgo-instr-gen -instrprof ${SLP_BC_IN}.bc -o ${1}.prof.bc
 # Generate binary executable with profiler embedded
 clang -fprofile-instr-generate ${1}.prof.bc -o ${1}.prof
 # Collect profiling data
-./${1}.prof # ${INPUT}
+./${1}.prof > /dev/null # ${INPUT}
 # Translate raw profiling data into LLVM data format
 llvm-profdata merge -output=${1}_SLP.profdata default.profraw
 
@@ -56,6 +56,7 @@ clang ${1}_SLP.bc -S
 
 if [ "$(diff slp_output slp_correct)" != "" ]; then
     echo -e ">> FAIL\n"
+    diff slp_output slp_correct > FAIL.txt
 else
     echo -e ">> PASS\n"
 fi

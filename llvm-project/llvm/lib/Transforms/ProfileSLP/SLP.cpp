@@ -2,6 +2,9 @@
 
 using namespace llvm;
 
+//#define ALLOW_LOADS
+//#define ALLOW_FP
+
 struct IsomorphicGroup {
     bool validOp;
     int size;
@@ -12,9 +15,17 @@ struct IsomorphicGroup {
     IsomorphicGroup(Instruction* instr){
         opName = instr->getOpcodeName();
         opType = ProfileSLP::opToInstr[opName];
-        validOp = (opType == ProfileSLP::OpType::IALU) ||
-                  (opType == ProfileSLP::OpType::FALU) ||
-                  (opType == ProfileSLP::OpType::LOAD);
+        validOp = (opType == ProfileSLP::OpType::IALU)
+                  #ifdef ALLOW_FP 
+                    || (opType == ProfileSLP::OpType::FALU); 
+                  #else 
+                    ; 
+                  #endif
+                  #ifdef ALLOW_LOADS 
+                    || (opType == ProfileSLP::OpType::LOAD); 
+                  #else 
+                    ; 
+                  #endif
         if(validOp){
             instrs.push_back(instr);
             size = 1;
@@ -24,24 +35,8 @@ struct IsomorphicGroup {
     }
 
     bool isIsomorphicToGroup(Instruction* newInstr){
-        if(validOp){
-            std::string newOpName = newInstr->getOpcodeName();
-            if(opName == newOpName){ //Compatible operations for vectorization
-                //Don't pack this instruction into the group if it uses the results of previous 
-                // instructions within the same group.
-                for(auto groupInst : instrs){
-                    for(User *U : groupInst->users()){
-                        if (Instruction *inst = dyn_cast<Instruction>(U)) {
-                            if(newInstr == inst){
-                                return false;
-                            }
-                        }
-                    }
-                }
-                return true;
-            }
-        }
-        return false;
+        std::string newOpName = newInstr->getOpcodeName();
+        return validOp && (opName == newOpName);
     }
 
     void insertIfIsomorphic(Instruction* newInstr){
@@ -52,19 +47,64 @@ struct IsomorphicGroup {
     }
 };
 
+template <class T, class I> 
+void ProfileSLP::addIfInMap(T item, std::map<T, I>* map, std::vector<I>* vec){
+    auto found = map->find(item);
+    if(found != map->end()){
+        vec->push_back(found->second);
+    }
+}
+
 //Breadth-first toplogical sort
-std::vector<int> ProfileSLP::BF_ToplogicalSort(std::map<Instruction*, int> &instrs){
-    //Construct a DAG for the def-use chains
+std::vector<int> ProfileSLP::BF_ToplogicalSort(
+    std::map<Instruction*, int> &instr_map, 
+    std::vector<Instruction*> &instrs
+){
+    //Construct a DAG for the program dependencies
     errs() << "Building DAG \n";
     int nInstrs = instrs.size();
     std::vector<std::vector<int>> DAG(nInstrs);
+    Instruction* lastBranch = nullptr;
+    std::vector<Instruction*> prevStores;
+    std::vector<Instruction*> prevLoads;
     for(auto &from : instrs){
-        for(User *U : from.first->users()){
+        auto def = instr_map.find(from);
+
+        //Def-Use (data)
+        for(User *U : from->users()){
             if (Instruction *inst = dyn_cast<Instruction>(U)) {
-                if(instrs.find(inst) != instrs.end()){ //Must actually be in the trace
-                    DAG[from.second].push_back(instrs.find(inst)->second);
-                }
+                addIfInMap<Instruction*, int>(inst, &instr_map, &DAG[def->second]);
             }
+        }
+
+        //Control dependencies
+        //Make branches depend on the completion of all instructions before them in program order
+        if(isa<BranchInst>(from)){
+            if(lastBranch != nullptr){
+                auto br = instr_map.find(lastBranch);
+                DAG[br->second].push_back(def->second);
+            }
+            lastBranch = from;
+        } else {
+            //Store-->Load dependencies
+            //Make loads dependent on all previous stores and vice versa
+            if(isa<LoadInst>(from)){
+                for(auto prevStore : prevStores){
+                    auto st = instr_map.find(prevStore);
+                    DAG[st->second].push_back(def->second);
+                }
+                prevLoads.push_back(from);
+            } else if(isa<StoreInst>(from)){
+                for(auto prevLoad : prevLoads){
+                    auto ld = instr_map.find(prevLoad);
+                    DAG[ld->second].push_back(def->second);
+                }
+                prevStores.push_back(from);
+            }
+
+            //All non-branch instructions should execute before their closest branch
+            auto closestBranch = from->getParent()->getTerminator();
+            addIfInMap<Instruction*, int>(closestBranch, &instr_map, &DAG[def->second]);
         }
     }
 
@@ -86,6 +126,10 @@ std::vector<int> ProfileSLP::BF_ToplogicalSort(std::map<Instruction*, int> &inst
         }
     }
 
+    if(q.size() == 0){
+        errs() << "NO INSTRUCTIONS WITH ZERO DEPENDENCIES \n";
+    }
+
     //Dequeue nodes with zero dependencies, then iteratively update the dependency list
     errs() << "Dequeueing \n";
     std::vector<int> solution;
@@ -97,7 +141,7 @@ std::vector<int> ProfileSLP::BF_ToplogicalSort(std::map<Instruction*, int> &inst
 
         //Update dependency list
         //Anything that depends on the 'current' instruction now has one less dependency
-        for(int i : DAG[current]){ 
+        for(int i : DAG[current]){
             --numDeps[i];
             if(numDeps[i] == 0) { 
                 q.push(i); //No dependencies left, so add to queue
@@ -105,12 +149,6 @@ std::vector<int> ProfileSLP::BF_ToplogicalSort(std::map<Instruction*, int> &inst
         }
     }
     return solution;
-}
-
-void ProfileSLP::printInstrGroup(std::vector<Instruction*> group){
-    for(const auto instr : group){
-        errs() << *instr << "\n";
-    }
 }
 
 std::vector<std::vector<Instruction*>> ProfileSLP::getSLP(Function &F){
@@ -123,13 +161,13 @@ std::vector<std::vector<Instruction*>> ProfileSLP::getSLP(Function &F){
         errs() << "SLP Trace " << i << "\n";
 
         //Extract all instructions
-        std::map<Instruction*, int> instr_map;
+        std::map<Instruction*, int> instrMap;
         std::vector<Instruction*> instrs;
         int instr_num = 0;
         for(BasicBlock *b : traces[i]){
             errs() << "BB: " << *b << "\n";
             for(auto &in : *b){ 
-                instr_map[&in] = instr_num;
+                instrMap[&in] = instr_num;
                 instrs.push_back(&in);
                 ++instr_num;
             }
@@ -137,52 +175,75 @@ std::vector<std::vector<Instruction*>> ProfileSLP::getSLP(Function &F){
         errs() << "End trace printout \n";
 
         //Find the breadth-first topological ordering of the def-use chains within this superblock
-        auto topsort_order = BF_ToplogicalSort(instr_map);
+        auto topsort_order = BF_ToplogicalSort(instrMap, instrs);
+
+        //Build vectorizable groups
+        //Store candidates
+        std::map<std::string, IsomorphicGroup*> vec_cands;
+        IsomorphicGroup* currentGroup;
+        //Store info about current layer
+        std::map<Instruction*, int> instrLayers;
+        std::unordered_set<Value*> layerDests;
+        int currentLayer = 0;
+        for(auto idx : topsort_order){
+            auto in = instrs[idx];
+
+            //Figure out what layer in the dependency DAG we're in. Only vectorize things in the same layer
+            if(!isa<StoreInst>(in)){
+                int numOps = in->getNumOperands();
+                for(int op = 0; op < numOps; ++op){
+                    if(layerDests.find(in->getOperand(op)) != layerDests.end()){
+                        ++currentLayer;
+                        //Now we're on a new layer, so we can't vectorize with previous entries
+                        layerDests.clear();
+                        vec_cands.clear(); //Need to reclaim memory here too
+                        break;
+                    }
+                }
+            }
+            layerDests.insert(in);
+            instrLayers.insert(std::pair<Instruction*, int>(in, currentLayer));
+
+            std::string opName = in->getOpcodeName();
+            if(vec_cands.find(opName) == vec_cands.end()){ //Start a new isomorphic group with a given op type
+                currentGroup = new IsomorphicGroup(in);
+                vec_cands.insert(std::pair<std::string, IsomorphicGroup*>(opName, currentGroup));
+            } else {
+                currentGroup = vec_cands[opName];
+                currentGroup->insertIfIsomorphic(in);
+                if(currentGroup->size == ProfileSLP::SIMD_WIDTH){ //Upgrade to confirmed vectorization once we've reached SIMD width
+                    //errs() << "Found a vector of ops: " << opName << "\n";
+                    //printInstrGroup(currentGroup->instrs);
+                    vec_confirmed.push_back(currentGroup->instrs);
+                    vec_cands.erase(opName);
+                    ++vectorizedCount;
+                }
+            }
+        }
 
         //Print topological order
         errs() << "Topological order:\n";
         for(auto idx : topsort_order){
             auto in = instrs[idx];
-            errs() << *in << "\n";
-        }
-
-        //Build vectorizable groups
-        std::map<std::string, IsomorphicGroup*> vec_cands;
-        IsomorphicGroup* currentGroup;
-        for(auto idx : topsort_order){
-            auto in = instrs[idx];
-            //This is the "visit" function 
-            if (isa<StoreInst>(in)){ //Don't try to hoist up through stores, so reset vectorization candidates
-                //Process isomorphic groups
-                vec_cands.clear();
-            } else {
-                std::string opName = in->getOpcodeName();
-                if(vec_cands.find(opName) == vec_cands.end()){ //Start a new isomorphic group with a given op type
-                    currentGroup = new IsomorphicGroup(in);
-                    vec_cands.insert(std::pair<std::string, IsomorphicGroup*>(opName, currentGroup));
-                } else {
-                    currentGroup = vec_cands[opName];
-                    currentGroup->insertIfIsomorphic(in);
-                    if(currentGroup->size == ProfileSLP::SIMD_WIDTH){ //Upgrade to confirmed vectorization once we've reached SIMD width
-                        errs() << "Found a vector of ops: " << opName << "\n";
-                        printInstrGroup(currentGroup->instrs);
-                        vec_confirmed.push_back(currentGroup->instrs);
-                        vec_cands.erase(opName);
-                        ++vectorizedCount;
-                    }
-                }
-            }
+            errs() << "Layer: " << instrLayers.find(in)->second << " Instr: " << *in << "\n";
         }
     }
+
+    errs() << "SLP Vectorization Groups: \n"; 
+    for(auto vec : vec_confirmed){
+        errs() << "Group: \n";
+        printInstrGroup(vec);
+    }
+
     delete m_traces; //Free up memory
     return vec_confirmed;
 }
 
 std::map<std::string, ProfileSLP::OpType> ProfileSLP::opToInstr = {
     // Branch Instructions
-    {"br", UB_BRANCH}, // Start as unbiased, change to biased
-    {"switch", UB_BRANCH}, 
-    {"indirectbr", UB_BRANCH},
+    {"br", BRANCH}, // Start as unbiased, change to biased
+    {"switch", BRANCH}, 
+    {"indirectbr", BRANCH},
 
     // Integer ALU Instructions
     {"add", IALU},

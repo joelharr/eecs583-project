@@ -3,6 +3,7 @@ add_llvm_library(ProfileSLP MODULE
   Superblock.cpp
   SLP.cpp
   Vectorize.cpp
+  hoist.cpp
 
   PLUGIN_TOOL
   opt

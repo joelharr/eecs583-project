@@ -2,6 +2,13 @@
 
 using namespace llvm;
 
+//Utility function
+void ProfileSLP::printInstrGroup(std::vector<Instruction*> group){
+    for(const auto instr : group){
+        errs() << *instr << "\n";
+    }
+}
+
 // Specify the list of analysis passes that will be used inside your pass.
 void ProfileSLP::getAnalysisUsage(AnalysisUsage &AU) const {
     AU.addRequired<BlockFrequencyInfoWrapperPass>();
@@ -11,17 +18,11 @@ void ProfileSLP::getAnalysisUsage(AnalysisUsage &AU) const {
 
 bool ProfileSLP::runOnFunction(Function &F) {
     bool changed = getSuperblocks(F);
-    #ifdef GET_SLP //Enable and disable getting SLP
     auto SLP_vecs = getSLP(F);
-    errs() << "SLP Vectorization Groups: \n"; 
-    for(auto vec : SLP_vecs){
-        errs() << "Group: \n";
-        printInstrGroup(vec);
-    }
-    LLVMContext& context = F.getContext();
-    vectorize(SLP_vecs[0], context);
-    vectorize(SLP_vecs[1], context);
-    #endif
+    changed |= hoist(SLP_vecs);
+    //LLVMContext& context = F.getContext();
+    //vectorize(SLP_vecs[0], context);
+    //vectorize(SLP_vecs[1], context);
     return true;
 }
 
