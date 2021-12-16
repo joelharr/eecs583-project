@@ -19,8 +19,7 @@ bool ProfileSLP::runOnFunction(Function &F) {
         printInstrGroup(vec);
     }
     LLVMContext& context = F.getContext();
-    vectorize(SLP_vecs[0], context);
-    vectorize(SLP_vecs[1], context);
+    vectorizeWrapper(SLP_vecs, context);
     #endif
     return true;
 }

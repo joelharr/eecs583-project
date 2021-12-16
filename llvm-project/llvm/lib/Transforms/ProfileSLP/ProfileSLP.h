@@ -65,6 +65,7 @@ struct ProfileSLP : public FunctionPass {
 
     //Function for emitting Vector IR
     Instruction* vectorize(std::vector<Instruction*> instr, LLVMContext& context);
+    Instruction* vectorizeWrapper(std::vector<std::vector<Instruction*>> &instr_groups, LLVMContext& context);
 };
 
 #endif
