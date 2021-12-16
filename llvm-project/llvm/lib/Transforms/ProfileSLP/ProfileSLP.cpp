@@ -20,10 +20,12 @@ bool ProfileSLP::runOnFunction(Function &F) {
     bool changed = getSuperblocks(F);
     std::vector<std::vector<Instruction*>> sortedOrders(m_traces->size());
     auto SLP_vecs = getSLP(&sortedOrders);
-    changed |= reorder(SLP_vecs, &sortedOrders);
-    //LLVMContext& context = F.getContext();
-    //vectorizeWrapper(SLP_vecs, context);
+    changed |= reorder(&SLP_vecs, &sortedOrders);
+
+    LLVMContext& context = F.getContext();
+    vectorizeWrapper(SLP_vecs, context);
     //Print the final program
+    errs() << "FINAL PROGRAM: \n";
     for (auto &bb : F) {
         errs() << bb << "\n";
     }

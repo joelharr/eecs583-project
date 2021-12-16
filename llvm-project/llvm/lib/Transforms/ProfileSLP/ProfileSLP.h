@@ -34,7 +34,7 @@ struct ProfileSLP : public FunctionPass {
     };
     static char ID;
     static std::map<std::string, ProfileSLP::OpType> opToInstr;
-    static const int SIMD_WIDTH = 4; //2 is good for testing, maybe 4 for performance. Never choose 1
+    static const int SIMD_WIDTH = 2; //2 is good for testing, maybe 4 for performance. Never choose 1
 
     ProfileSLP() : FunctionPass(ID) {}
 
@@ -64,7 +64,7 @@ struct ProfileSLP : public FunctionPass {
     template <class T, class I> void addIfInMap(T item, std::map<T, I>* map, std::vector<I>* vec);
 
     //Functions for hoisting functions into their vectorizable groups
-    bool reorder(std::vector<std::vector<Instruction*>> SLP_vecs, std::vector<std::vector<Instruction*>>* sortedOrders_p);
+    bool reorder(std::vector<std::vector<Instruction*>>* SLP_vecs, std::vector<std::vector<Instruction*>>* sortedOrders_p);
 
     //Function for emitting Vector IR
     Instruction* vectorize(std::vector<Instruction*> instr, LLVMContext& context);

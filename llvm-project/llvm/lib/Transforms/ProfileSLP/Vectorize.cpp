@@ -2,6 +2,7 @@
 #include "llvm/IR/IRBuilder.h"
 
 Instruction* ProfileSLP::vectorizeWrapper(std::vector<std::vector<Instruction*>> &instr_groups, LLVMContext& context) {
+    errs() << "Vectorizing... \n";
     for (int i = 0; i < instr_groups.size(); i++) {
         vectorize(instr_groups[i], context);
     }
@@ -9,7 +10,6 @@ Instruction* ProfileSLP::vectorizeWrapper(std::vector<std::vector<Instruction*>>
 }
 
 Instruction* ProfileSLP::vectorize(std::vector<Instruction*> instr, LLVMContext& context) {
-
 	Instruction *firstI = *(instr.begin());
     Instruction *lastI = *(instr.begin()+(instr.size()-1));
     BasicBlock *parent = firstI->getParent();
@@ -30,19 +30,23 @@ Instruction* ProfileSLP::vectorize(std::vector<Instruction*> instr, LLVMContext&
     // load all values in vectors
     for (int i = 0; i < width; i++) {
     	if (auto *loadInst = dyn_cast<Instruction>(instr[i]->getOperand(0))) {
+            errs() << "1\n";
     		next1 = build.CreateInsertElement(next1, loadInst, build.getInt64(i));
       	} else {
       		auto *alloc = build.CreateAlloca(Ty, 0, nullptr, "");
       		build.CreateStore(instr[i]->getOperand(0), alloc);
       		auto *load = build.CreateLoad(Ty, alloc);
+            errs() << "2\n";
       		next1 = build.CreateInsertElement(next1, load, build.getInt64(i));
       	}
       	if (auto *loadInst = dyn_cast<Instruction>(instr[i]->getOperand(1))) {
+            errs() << "3\n";
     		next2 = build.CreateInsertElement(next2, loadInst, build.getInt64(i));
       	} else {
-      		auto *alloc = build.CreateAlloca(Ty, 0, nullptr, "");
+      		auto *alloc = build.CreateAlloca(instr[i]->getOperand(1)->getType(), 0, nullptr, "");
       		build.CreateStore(instr[i]->getOperand(1), alloc);
-      		auto *load = build.CreateLoad(Ty, alloc);
+      		auto *load = build.CreateLoad(instr[i]->getOperand(1)->getType(), alloc);
+            errs() << "4\n";
       		next2 = build.CreateInsertElement(next2, load, build.getInt64(i));
       	}
     }

@@ -3,9 +3,10 @@
 using namespace llvm;
 
 bool ProfileSLP::reorder(
-    std::vector<std::vector<Instruction*>> SLP_vecs,
+    std::vector<std::vector<Instruction*>>* SLP_vecs,
     std::vector<std::vector<Instruction*>>* sortedOrders_p
 ){
+    /*
     errs() << "Performing reordering... \n";
     int traceCtr = 0;
     auto sortedOrders = *sortedOrders_p;
@@ -29,6 +30,14 @@ bool ProfileSLP::reorder(
                 updateBBNext = true;
             } else {
                 auto nextI = in->clone();
+                //Repair SLP_vecs
+                for(int iv = 0; iv < SLP_vecs->size(); ++iv){
+                    for(int jv = 0; jv < (*SLP_vecs)[iv].size(); ++jv){
+                        if(in == (*SLP_vecs)[iv][jv]){
+                            (*SLP_vecs)[iv][jv] = nextI;
+                        }
+                    }
+                }
                 if(updateBBNext){ //Advanced to the next BB
                     currentBB = in->getParent();
                     auto firstInBB = currentBB->getIterator()->getFirstNonPHI();
@@ -47,10 +56,11 @@ bool ProfileSLP::reorder(
             }
         }
     }
+    */
 
     //Perform hoisting
     errs() << "Hoisting... \n";
-    for(auto vec : SLP_vecs){ //Works because this vector was built in topological order
+    for(auto &vec : *SLP_vecs){ //Works because this vector was built in topological order
         auto first = vec[0];
         for(int i = 1; i < vec.size(); ++i){ //Hoist all others up to below first
             auto nextI = vec[i]->clone();
