@@ -30,23 +30,19 @@ Instruction* ProfileSLP::vectorize(std::vector<Instruction*> instr, LLVMContext&
     // load all values in vectors
     for (int i = 0; i < width; i++) {
     	if (auto *loadInst = dyn_cast<Instruction>(instr[i]->getOperand(0))) {
-            errs() << "1\n";
     		next1 = build.CreateInsertElement(next1, loadInst, build.getInt64(i));
       	} else {
       		auto *alloc = build.CreateAlloca(Ty, 0, nullptr, "");
       		build.CreateStore(instr[i]->getOperand(0), alloc);
       		auto *load = build.CreateLoad(Ty, alloc);
-            errs() << "2\n";
       		next1 = build.CreateInsertElement(next1, load, build.getInt64(i));
       	}
       	if (auto *loadInst = dyn_cast<Instruction>(instr[i]->getOperand(1))) {
-            errs() << "3\n";
     		next2 = build.CreateInsertElement(next2, loadInst, build.getInt64(i));
       	} else {
-      		auto *alloc = build.CreateAlloca(instr[i]->getOperand(1)->getType(), 0, nullptr, "");
+      		auto *alloc = build.CreateAlloca(Ty, 0, nullptr, "");
       		build.CreateStore(instr[i]->getOperand(1), alloc);
-      		auto *load = build.CreateLoad(instr[i]->getOperand(1)->getType(), alloc);
-            errs() << "4\n";
+      		auto *load = build.CreateLoad(Ty, alloc);
       		next2 = build.CreateInsertElement(next2, load, build.getInt64(i));
       	}
     }

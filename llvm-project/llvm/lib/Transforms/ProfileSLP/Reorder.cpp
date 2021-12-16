@@ -6,7 +6,6 @@ bool ProfileSLP::reorder(
     std::vector<std::vector<Instruction*>>* SLP_vecs,
     std::vector<std::vector<Instruction*>>* sortedOrders_p
 ){
-    /*
     errs() << "Performing reordering... \n";
     int traceCtr = 0;
     auto sortedOrders = *sortedOrders_p;
@@ -56,9 +55,9 @@ bool ProfileSLP::reorder(
             }
         }
     }
-    */
 
     //Perform hoisting
+    /*
     errs() << "Hoisting... \n";
     for(auto &vec : *SLP_vecs){ //Works because this vector was built in topological order
         auto first = vec[0];
@@ -71,5 +70,6 @@ bool ProfileSLP::reorder(
             vec[i]->eraseFromParent();
         }
     }
+    */
     return true;
 }
