@@ -20,13 +20,8 @@ bool ProfileSLP::runOnFunction(Function &F) {
     bool changed = getSuperblocks(F);
     auto SLP_vecs = getSLP(F);
     changed |= hoist(SLP_vecs);
-    errs() << "SLP Vectorization Groups: \n"; 
-    for(auto vec : SLP_vecs){
-        errs() << "Group: \n";
-        printInstrGroup(vec);
-    }
-    LLVMContext& context = F.getContext();
-    vectorizeWrapper(SLP_vecs, context);
+    //LLVMContext& context = F.getContext();
+    //vectorizeWrapper(SLP_vecs, context);
     return true;
 }
 

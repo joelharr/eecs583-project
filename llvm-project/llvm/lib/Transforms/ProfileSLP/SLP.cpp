@@ -67,13 +67,16 @@ std::vector<int> ProfileSLP::BF_ToplogicalSort(
     Instruction* lastBranch = nullptr;
     std::vector<Instruction*> prevStores;
     std::vector<Instruction*> prevLoads;
+    std::vector<Value*> prevDests;
     for(auto &from : instrs){
         auto def = instr_map.find(from);
 
         //Def-Use (data)
         for(User *U : from->users()){
             if (Instruction *inst = dyn_cast<Instruction>(U)) {
-                addIfInMap<Instruction*, int>(inst, &instr_map, &DAG[def->second]);
+                if(!isa<PHINode>(inst)){ //Phi nodes aren't users in traces UNLESS they're circular dependencies
+                    addIfInMap<Instruction*, int>(inst, &instr_map, &DAG[def->second]);
+                }
             }
         }
 
@@ -126,8 +129,8 @@ std::vector<int> ProfileSLP::BF_ToplogicalSort(
         }
     }
 
-    if(q.size() == 0){
-        errs() << "NO INSTRUCTIONS WITH ZERO DEPENDENCIES \n";
+    if(q.size() == 0){ //Check for circular dependence
+        errs() << "FOUND CIRCULAR DEPENDENCE \n";
     }
 
     //Dequeue nodes with zero dependencies, then iteratively update the dependency list
