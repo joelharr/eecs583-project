@@ -97,10 +97,14 @@ std::vector<int> ProfileSLP::BF_ToplogicalSort(
                     DAG[st->second].push_back(def->second);
                 }
                 prevLoads.push_back(from);
-            } else if(isa<StoreInst>(from)){
+            } else if(isa<StoreInst>(from) || isa<CallInst>(from)){
                 for(auto prevLoad : prevLoads){
                     auto ld = instr_map.find(prevLoad);
                     DAG[ld->second].push_back(def->second);
+                }
+                if(lastBranch != nullptr){ //Stores shouldn't move above branches
+                    auto br = instr_map.find(lastBranch);
+                    DAG[br->second].push_back(def->second);
                 }
                 prevStores.push_back(from);
             }
@@ -154,7 +158,9 @@ std::vector<int> ProfileSLP::BF_ToplogicalSort(
     return solution;
 }
 
-std::vector<std::vector<Instruction*>> ProfileSLP::getSLP(Function &F){
+std::vector<std::vector<Instruction*>> ProfileSLP::getSLP(
+    std::vector<std::vector<Instruction*>>* sortedOrders
+){
     errs() << "Running getSLP... \n";
     //Iterate through all traces
     std::vector<std::vector<BasicBlock *>> traces = *m_traces;
@@ -190,6 +196,7 @@ std::vector<std::vector<Instruction*>> ProfileSLP::getSLP(Function &F){
         int currentLayer = 0;
         for(auto idx : topsort_order){
             auto in = instrs[idx];
+            (*sortedOrders)[i].push_back(in);
 
             //Figure out what layer in the dependency DAG we're in. Only vectorize things in the same layer
             if(!isa<StoreInst>(in)){

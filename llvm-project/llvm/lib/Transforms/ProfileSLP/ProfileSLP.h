@@ -22,6 +22,7 @@ using namespace llvm;
 struct ProfileSLP : public FunctionPass {
     
     enum OpType { //Ordering in this enum specifies the stat's print order
+        ENUM_START,
         IALU,
         FALU,
         LOAD,
@@ -33,7 +34,7 @@ struct ProfileSLP : public FunctionPass {
     };
     static char ID;
     static std::map<std::string, ProfileSLP::OpType> opToInstr;
-    static const int SIMD_WIDTH = 2; //2 is good for testing, maybe 4 for performance. Never choose 1
+    static const int SIMD_WIDTH = 4; //2 is good for testing, maybe 4 for performance. Never choose 1
 
     ProfileSLP() : FunctionPass(ID) {}
 
@@ -59,11 +60,11 @@ struct ProfileSLP : public FunctionPass {
 
     //Functions for identifying vectorizable groups
     std::vector<int> BF_ToplogicalSort(std::map<Instruction*, int> &instr_map, std::vector<Instruction*> &instrs);
-    std::vector<std::vector<Instruction*>> getSLP(Function &F);
+    std::vector<std::vector<Instruction*>> getSLP(std::vector<std::vector<Instruction*>>* sortedOrders);
     template <class T, class I> void addIfInMap(T item, std::map<T, I>* map, std::vector<I>* vec);
 
     //Functions for hoisting functions into their vectorizable groups
-    bool hoist(std::vector<std::vector<Instruction*>> SLP_vecs);
+    bool reorder(std::vector<std::vector<Instruction*>> SLP_vecs, std::vector<std::vector<Instruction*>>* sortedOrders_p);
 
     //Function for emitting Vector IR
     Instruction* vectorize(std::vector<Instruction*> instr, LLVMContext& context);

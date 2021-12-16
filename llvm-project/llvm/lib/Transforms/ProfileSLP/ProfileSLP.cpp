@@ -18,10 +18,15 @@ void ProfileSLP::getAnalysisUsage(AnalysisUsage &AU) const {
 
 bool ProfileSLP::runOnFunction(Function &F) {
     bool changed = getSuperblocks(F);
-    auto SLP_vecs = getSLP(F);
-    changed |= hoist(SLP_vecs);
+    std::vector<std::vector<Instruction*>> sortedOrders(m_traces->size());
+    auto SLP_vecs = getSLP(&sortedOrders);
+    changed |= reorder(SLP_vecs, &sortedOrders);
     //LLVMContext& context = F.getContext();
     //vectorizeWrapper(SLP_vecs, context);
+    //Print the final program
+    for (auto &bb : F) {
+        errs() << bb << "\n";
+    }
     return true;
 }
 
